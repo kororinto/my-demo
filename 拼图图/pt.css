@@ -1,0 +1,97 @@
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        .father {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 600px;
+            height: 600px;
+            background-color: #fff;
+            border: 4px solid #eee;
+        }
+
+        .father div {
+            box-sizing: border-box;
+            position: absolute;
+            width: 200px;
+            height: 200px;
+            border: 1px solid #eee;
+            /* background-position-x: 200px;
+            background-position-y: 200px; */
+            background-image: url(./拼图图片/img4.jpg);
+            background: no-repeat;
+            background-size: 600px 600px;
+        }
+
+        .barrier {
+            top: 400px;
+            left: 400px;
+            background-image: url(./拼图图片/hs.jpg);
+        }
+
+        .control {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            position: absolute;
+            left: 10%;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 400px;
+            height: 600px;
+            background-color: skyblue;
+        }
+
+        .control div {
+            display: flex;
+            flex: 1;
+            width: 100%;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            color: #fff;
+        }
+
+        .start span {
+            font-size: 16px;
+            color: red;
+        }
+
+        .difficulty {
+            background-color: #ff6c00;
+            color: #fff;
+            font-size: 30px;
+        }
+
+        .difficulty p {
+            font-size: 40px;
+        }
+
+        .difficulty span {
+            font-size: 75%;
+            padding-left: 15px;
+        }
+
+        .hide {
+            color: transparent;
+        }
+
+        .record span {
+            margin-left: 10px;
+            font-size: 30px;
+            color: rgb(51, 209, 64);
+        }
+
+        .pic {
+            position: absolute;
+            right: 300px;
+            top: 50%;
+            width: 300px;
+            height: 300px;
+            border: 1px solid #000;
+        }

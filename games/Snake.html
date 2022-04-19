@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #interface {
+            display: block;
+            border: 1px solid #333;
+            margin: 100px auto 0;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 
+        贪吃蛇
+        画布以10px格子划分 每个果实/蛇身/蛇头占一格
+        每个格子用坐标[x, y]表示
+        移动: 蛇头朝某个方向坐标+1, 蛇身的第一节等于蛇头坐标 去掉最后一节，剩下的蛇身全体前移
+        转向: 蛇头改变方向
+        果实: 随机生成坐标
+        吃掉: 果实重新刷新坐标, 蛇身加一节
+        死亡: 蛇头超过边界/ 撞到自身
+     -->
+    <canvas id="interface" width="600" height="400"></canvas>
+    <script>
+        class Canvas {
+            constructor(opts) {
+                this.el = opts.el
+                this.gridWidth = opts.gridWidth || 10
+                this.fillColor = opts.fillColor || '#eee'
+                this.strokeColor = opts.strokeColor || '#ccc'
+                this.canvas = typeof this.el === 'object' ? this.el : document.querySelector(this.el)
+                this.context = this.canvas.getContext('2d');
+                this.column = this.canvas.clientWidth / this.gridWidth
+                this.row = this.canvas.clientHeight / this.gridWidth
+                this.fruit = this.creatFruit(this.column, this.row)
+                this.fruitColor = opts.fruitColor || 'hsla(0,100%,50%,0.8)'
+                this.drawBackground()
+            }
+
+            creatFruit(column, row) {
+                return [getRandomIntInclusive(0, column - 1), getRandomIntInclusive(0, row - 1)]
+            }
+
+            drawBackground() {
+                this.context.save()
+                this.context.fillStyle = this.fillColor
+                this.context.strokeStyle = this.strokeColor
+                for (let i = 0; i < this.column; i++) {
+                    for (let j = 0; j < this.row; j++) {
+                        this.context.fillRect(i * this.gridWidth, j * this.gridWidth, this.gridWidth, this.gridWidth)
+                        this.context.strokeRect(i * this.gridWidth, j * this.gridWidth, this.gridWidth, this.gridWidth)
+                    }
+                }
+                this.context.restore()
+                // 果实
+                this.context.save()
+                this.context.fillStyle = this.fruitColor
+                this.context.fillRect(this.fruit[0] * this.gridWidth, this.fruit[1] * this.gridWidth, this.gridWidth, this.gridWidth)
+                this.context.restore()
+            }
+
+            refresh() {
+                this.context.clearRect(0, 0, this.canvas.clientWidth, this.canvas.clientHeight)
+                this.drawBackground()
+            }
+        }
+
+        class Snake {
+            constructor(opts) {
+                this.headColor = opts.headColor || 'hsla(0,100%,50%,0.8)'
+                this.bodyColor = opts.bodyColor || 'hsla(200,100%,50%,0.8)'
+                this.sectsNum = opts.sectsNum || 5
+                this.bg = opts.bg
+                this.coordinate = this.initCoordinate(this.bg.column, this.bg.row)
+                this.body = this.initBody()
+                this.dirct = opts.dirct || null
+                this.speed = opts.speed || 1
+                this.drawSnake()
+            }
+
+            initBody() {
+                let body = []
+                let delta = [0, 1, 0, -1, 1, 0, -1, 0]
+                let random = getRandomIntInclusive(0, 3) * 2
+                for (let i = 0; i < this.sectsNum; i++) {
+                    body.push([this.coordinate[0] + delta[random] * (i + 1), this.coordinate[1] + delta[random + 1] * (i + 1)])
+                }
+                return body
+            }
+
+            initCoordinate(column, row) {
+                return [getRandomIntInclusive(0, column - 1), getRandomIntInclusive(0, row - 1)]
+            }
+
+            drawSnake() {
+                this.bg.context.save()
+                this.bg.context.fillStyle = this.headColor
+                this.bg.context.fillRect(this.coordinate[0] * this.bg.gridWidth, this.coordinate[1] * this.bg.gridWidth, this.bg.gridWidth, this.bg.gridWidth)
+                this.bg.context.fillStyle = this.bodyColor
+                for (let item of this.body) {
+                    this.bg.context.fillRect(item[0] * this.bg.gridWidth, item[1] * this.bg.gridWidth, this.bg.gridWidth, this.bg.gridWidth)
+                }
+                this.bg.context.restore()
+            }
+
+            move(delta) {
+                delta = delta || this.dirct
+                // 如果移动方向跟蛇身第一节相反 直接return
+                if (this.body[0].toString() == [this.coordinate[0] + delta[0], this.coordinate[1] + delta[1]].toString()) {
+                    return
+                }
+                // 如果移动之后跟蛇身碰撞 或 蛇头超出边界 死亡
+                let isTouchBody = this.body.join(' ').split(' ').includes([this.coordinate[0] + delta[0], this.coordinate[1] + delta[1]].toString())
+                let isTouchBorder = this.coordinate[0] + delta[0] < 0 || this.coordinate[0] + delta[0] > this.bg.column - 1 || this.coordinate[1] + delta[1] < 0 || this.coordinate[1] + delta[1] > this.bg.row - 1
+                if (isTouchBody || isTouchBorder) {
+                    console.log('死亡')
+                    return
+                }
+                let isEat = this.coordinate[0] + delta[0] == this.bg.fruit[0] && this.coordinate[1] + delta[1] == this.bg.fruit[1]
+                isEat && this.eat()
+                this.dirct = delta && delta.slice(0) || this.dirct
+                this.body = [[this.coordinate[0], this.coordinate[1]], ...this.body.slice(0, this.sectsNum - 1)].slice(0)
+                this.coordinate[0] += delta[0]
+                this.coordinate[1] += delta[1]
+                this.bg.refresh()
+                this.drawSnake()
+            }
+
+            eat() {
+                this.body = [...this.body.slice(0), [this.body[this.sectsNum - 1][0] - this.dirct[0], this.body[this.sectsNum - 1][1] - this.dirct[1]]]
+                this.sectsNum++
+                this.bg.fruit = this.bg.creatFruit(this.bg.column, this.bg.row)
+            }
+        }
+
+        const getRandomIntInclusive = (min, max) => {
+            return Math.floor(Math.random() * (max - min + 1)) + min //含最大值，含最小值 
+        }
+
+        const onKeyDown = () => {
+            (snake => {
+                // 37左 39右 38上 40下
+                switch (event.keyCode) {
+                    case 37:
+                        snake.move([-1, 0])
+                        break
+                    case 39:
+                        snake.move([1, 0])
+                        break
+                    case 38:
+                        snake.move([0, -1])
+                        break
+                    case 40:
+                        snake.move([0, 1])
+                        break
+                    default:
+                        break
+                }
+                clearTimeout(initGame.gameTimer)
+                initGame.gameTimer = setInterval(snake.move.bind(snake), 100 / snake.speed)
+            })(initGame.snake)
+        }
+
+        const initGame = (() => {
+            const bg = new Canvas({
+                el: '#interface'
+            })
+            const snake = new Snake({ bg })
+            document.addEventListener('keydown', onKeyDown)
+            let gameTimer = null
+            return {
+                bg, snake, gameTimer
+            }
+        })()
+    </script>
+
+</body>
+
+</html>

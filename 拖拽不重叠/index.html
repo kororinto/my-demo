@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Document</title>
+        <style>
+            .box {
+                position: relative;
+                margin: 100px auto;
+                width: 800px;
+                height: 600px;
+                border: 1px solid black;
+            }
+
+            [class^="rect"] {
+                position: absolute;
+                height: 100px;
+                width: 100px;
+            }
+
+            .rect1 {
+                left: 0;
+                top: 0;
+                background-color: red;
+            }
+
+            .rect2 {
+                right: 0;
+                top: 0;
+                background-color: green;
+            }
+            .rect3 {
+                right: 0;
+                bottom: 0;
+                background-color: yellow;
+            }
+        </style>
+    </head>
+
+    <body>
+        <!-- 父元素要有定位属性, 最好是relative, absolute的话还要z-index比子元素低 -->
+        <div class="box">
+            <!-- 子元素定位absolute -->
+            <div class="rect1"></div>
+            <div class="rect2"></div>
+            <div class="rect3"></div>
+        </div>
+    </body>
+    <script>
+        // 获取父盒子元素
+        const box = document.querySelector(".box")
+        // 获取所有子元素伪数组
+        // 伪数组: 可以像数组一样通过下标访问遍历其中的元素, 但他的实质不是数组类型, 可自行打印查看divList
+        const divList = box.children
+        // 记录鼠标按下时的位置
+        let mouseX, mouseY
+        // 记录鼠标按下时div的位置 和 div元素
+        let divLeft, divTop, divWidth, divHeight, div
+        // 鼠标移动
+        const mouseMoveHandler = (e) => {
+            // 阻止浏览器默认事件(可有效避免因浏览器引起的奇奇怪怪的现象)
+            e.preventDefault()
+            // (一) 基础: 改变div的位置, 把div的left和top值 加上 移动后的鼠标位置减去按下时的位置差值(赋值div.style.left在此函数最后)
+            let newLeft = divLeft + e.pageX - mouseX
+            let newTop = divTop + e.pageY - mouseY
+            // (二) 重要: 边界限定
+            // 算法核心:
+            //     1. 左边界限定: 如果div新的left小于0, 就让他等于0
+            //     2. 右边界限定: 如果div新的left大于box的宽减去div的宽, 就让他等于box的宽减去div的宽
+            //     3. 上边界限定: 如果div新的top小于0, 就让他等于0
+            //     4. 下边界限定: 如果div新的top大于box的高减去div的高, 就让他等于box的高减去div的高
+            // 数学表达式:
+            //     newLeft∈[0, box.clientWidth - div.clientWidth]
+            //     newTop∈[0, box.clientHeight - div.clientHeight]
+            // 以下两种写法都可以
+            //     1. 使用Math库函数中的max和min函数
+            //         newLeft = Math.min(Math.max(newLeft, 0), box.clientWidth - div.clientWidth)
+            //         newTop = Math.min(Math.max(newTop, 0), box.clientHeight - div.clientHeight)
+            //     2. 复合三元表达式
+            //         newLeft = newLeft < 0 ? 0 : (newLeft > box.clientWidth - div.clientWidth ? box.clientWidth - div.clientWidth : newLeft)
+            //         newTop = newTop < 0 ? 0 : (newTop > box.clientHeight - div.clientHeight ? box.clientHeight - div.clientHeight : newTop)
+            // 我更喜欢用Math的写法:
+            newLeft = Math.max(Math.min(newLeft, box.clientWidth - div.clientWidth), 0)
+            newTop = Math.max(Math.min(newTop, box.clientHeight - div.clientHeight), 0)
+            // (三) 拓展: 碰撞检测
+            for (let i = 0; i < divList.length; i++) {
+                let itemLeft = divList[i].offsetLeft
+                let itemTop = divList[i].offsetTop
+                let itemWidth = divList[i].offsetWidth
+                let itemHeight = divList[i].offsetHeight
+                // 不检测div自身
+                if (divList[i] === div) {
+                    continue
+                }
+                // 判断两个div是否有交集 有则表示发生碰撞
+                if (
+                    newTop + divHeight > itemTop &&
+                    newLeft < itemLeft + itemWidth &&
+                    newTop < itemTop + itemHeight &&
+                    newLeft + divWidth > itemLeft
+                ) {
+                    // 以下四个if是当item在角落时的手感优化(不好解释) 可以不加
+                    // 如果item的左侧留的空隙不够放拖动的div 则把这个空隙看成item的一部分
+                    if (itemLeft < divWidth) {
+                        itemWidth = itemLeft + itemWidth
+                        itemLeft = 0
+                    }
+                    // 如果item的右侧留的空隙不够放拖动的div 则把这个空隙看成item的一部分
+                    if (box.clientWidth - itemLeft - itemWidth < divWidth) {
+                        itemWidth = box.clientWidth - itemLeft
+                    }
+                    // 如果item的上侧留的空隙不够放拖动的div 则把这个空隙看成item的一部分
+                    if (itemTop < divHeight) {
+                        itemHeight = itemTop + itemHeight
+                        itemTop = 0
+                    }
+                    // 如果item的下侧留的空隙不够放拖动的div 则把这个空隙看成item的一部分
+                    if (box.clientHeight - itemTop - itemHeight < divHeight) {
+                        itemHeight = box.clientHeight - itemTop
+                    }
+                    // 接下来要判断到底是哪边碰撞的:
+                    // 看那个方向的重叠边长
+                    // 竖方向重叠边长 > 横方向重叠边长 则为左右碰撞
+                    // 横方向重叠边长 > 竖方向重叠边长 则为上下碰撞
+                    // 竖方向重叠边长: div1上边与div2下边差值 和 div2上边与div1下边差值 的 较小值(因为较小的值才是重叠的一边)
+                    let verticalOverLapSide = Math.min(
+                        Math.abs(newTop - itemTop - itemHeight),
+                        Math.abs(itemTop - newTop - divHeight),
+                    )
+                    // 横方向重叠边长: div1左边与div2右边差值 和 div2左边与div1右边差值 的 较小值(因为较小的值才是重叠的一边)
+                    let transverseOverlapSide = Math.min(
+                        Math.abs(newLeft - itemLeft - itemWidth),
+                        Math.abs(itemLeft - newLeft - divWidth),
+                    )
+                    // 上下碰撞
+                    if (verticalOverLapSide < transverseOverlapSide) {
+                        // 下边碰撞到上边 则让拖动中的div的下边与固定的div的上边重合
+                        if (newTop - itemTop - itemHeight < itemTop - newTop - divHeight) {
+                            newTop = itemTop - divHeight
+                        }
+                        // 上边碰撞到下边 则让拖动中的div的上边与固定的div的下边重合
+                        else {
+                            newTop = itemTop + itemHeight
+                        }
+                        // 边界处理
+                        if (newTop >= box.clientHeight - divHeight) {
+                            newTop = itemTop - divHeight
+                        } else if (newTop < 0) {
+                            newTop = itemTop + itemHeight
+                        }
+                    }
+                    // 左右碰撞
+                    else {
+                        // 右边碰撞到左边 则让拖动中的div的右边与固定的div的左边重合
+                        if (newLeft - itemLeft - itemWidth < itemLeft - newLeft - divWidth) {
+                            newLeft = itemLeft - divWidth
+                        }
+                        // 左边碰撞到右边 则让拖动中的div的左边与固定的div的右边重合
+                        else {
+                            newLeft = itemLeft + itemWidth
+                        }
+                        // 边界处理
+                        if (newLeft >= box.clientWidth - divWidth) {
+                            newLeft = itemLeft - divWidth
+                        } else if (newLeft < 0) {
+                            newLeft = itemLeft + itemWidth
+                        }
+                    }
+                }
+            }
+            div.style.left = newLeft + "px"
+            div.style.top = newTop + "px"
+        }
+        // 鼠标抬起
+        const mouseUpHandler = (e) => {
+            // 阻止浏览器默认事件(可有效避免因浏览器引起的奇奇怪怪的现象)
+            e.preventDefault()
+            // 防止鼠标重复绑定导致越来越卡 抬起后移除鼠标移动和抬起事件 鼠标按下时会再次绑定
+            document.removeEventListener("mousemove", mouseMoveHandler)
+            document.removeEventListener("mouseup", mouseUpHandler)
+        }
+        // 鼠标按下
+        const mouseDownHandler = (e) => {
+            // 阻止浏览器默认事件(可有效避免因浏览器引起的奇奇怪怪的现象)
+            e.preventDefault()
+            // 当前的div(触发mousedown事件的元素)
+            div = e.target
+            // 触发事件的元素是box中class含有'rect'的元素才执行代码
+            if (!div.className.includes("rect")) {
+                return
+            }
+            // 记录鼠标按下的位置(相对于document左上方)
+            mouseX = e.pageX
+            mouseY = e.pageY
+            // 记录鼠标按下时div的位置(left、top)
+            divLeft = div.offsetLeft
+            divTop = div.offsetTop
+            divWidth = div.offsetWidth
+            divHeight = div.offsetHeight
+            // 绑定鼠标移动事件 和 鼠标抬起事件
+            // 为什么绑定到document上:
+            // 1. 避免鼠标移速太快导致脱离了绑定的元素 触发不了mousemove事件
+            // 2. 移速太快或鼠标拖到绑定元素之外 会触发不了mouseup事件
+            document.addEventListener("mousemove", mouseMoveHandler)
+            document.addEventListener("mouseup", mouseUpHandler)
+        }
+        // 给box绑定事件(相当于事件委托)
+        // 事件委托/委派: 给要绑定的元素的父级元素绑定事件, 在回调中判断是否是需要触发的子元素
+        // 好处: 一万个子元素需要绑定事件得循环绑定一万次, 且事件绑定太多了会影响浏览器性能, 这种做法只需要绑定一个
+        box.addEventListener("mousedown", mouseDownHandler)
+    </script>
+</html>

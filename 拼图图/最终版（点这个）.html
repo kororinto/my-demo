@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Document</title>
+        <link rel="stylesheet" href="./pt.css" />
+    </head>
+
+    <body>
+        <div class="father">
+            <!-- <div class="box">1</div>
+        <div class="box">2</div>
+        <div class="box">3</div>
+        <div class="box">4</div>
+        <div class="box">5</div>
+        <div class="box">6</div>
+        <div class="box">7</div>
+        <div class="box">8</div> -->
+        </div>
+        <div class="control">
+            <div class="difficulty">
+                <p>3</p>
+                <span>阶</span>
+            </div>
+            <div class="addSteps">增加难度</div>
+            <div class="reduceSteps">降低难度</div>
+            <div class="hideprompt">隐藏序号提示</div>
+            <div class="start">点击开始游戏</div>
+            <div class="hack">开启外挂</div>
+            <div class="record">您的步数<span></span></div>
+        </div>
+        <div class="pic"></div>
+        <script src="./jquery-1.12.4.js"></script>
+        <script>
+            let steps = 3 //默认三阶
+            //更改难度
+            $(".addSteps").on("click", function () {
+                steps++
+                $(".difficulty p").text(steps)
+            })
+            $(".reduceSteps").on("click", function () {
+                steps--
+                $(".difficulty p").text(steps)
+            })
+            //开始游戏
+            $(".start").on("click", function () {
+                $(".father").html("")
+                // console.log($(window));
+                //清除键盘事件
+                // $(window).unbind('kedown')
+                game()
+                changePic()
+                // console.log($(window).keydown());
+            })
+            //隐藏提示
+            $(".hideprompt").on("click", function () {
+                $(".father div").toggleClass("hide")
+            })
+            //改变图片
+            let changePic = function () {
+                $(".father div").css("background-image", `url(./拼图图片/img${parseInt(Math.random() * 9)}.jpg)`)
+                $(".pic").css("background-image", $(".father div").css("background-image"))
+                $(".pic").css("background-size", "300px 300px ")
+                $(".barrier").css("background-image", `url(./拼图图片/hs.jpg)`)
+            }
+            let yourSteps = 0
+            $(".record span").text(yourSteps)
+            let once = true
+            let game = function () {
+                //给父盒子插入方块
+                for (let i = 0; i < steps * steps - 1; i++) {
+                    $(".father").append(`<div class="box">${i + 1}</div>`)
+                }
+                //设置盒子大小
+                $(".father div").css({
+                    height: 600 / steps,
+                    width: 600 / steps,
+                })
+
+                //函数求盒子定位(x,y)
+                let x = 0
+                let getPointX = function (order, steps) {
+                    //order => 方块下标
+                    for (let i = 0; i < steps; i++) {
+                        if (order % steps == (i + 1) % steps) x = (600 / steps) * i
+                        // console.log(x);
+                    }
+                    return x
+                }
+
+                let y = 0
+                let getPointY = function (order, steps) {
+                    for (let i = 0; i < steps; i++) {
+                        if (steps * i + 1 <= order && order < steps * (i + 1) + 1) {
+                            return (y = (600 / steps) * i)
+                        }
+                    }
+                }
+
+                //图片排布
+                for (let i = 0; i < $(".father div").length; i++) {
+                    $(".box")
+                        .eq(i)
+                        .css({
+                            "background-img": `url(./拼图图片/img4.jpg)`,
+                            top: getPointY(i + 1, steps),
+                            left: getPointX(i + 1, steps),
+                        })
+                        .css("background-position-x", -getPointX(i + 1, steps))
+                        .css("background-position-y", -getPointY(i + 1, steps))
+                        .attr("data-rank", i)
+                }
+
+                //插入障碍方块
+                $(".father").append(`<div class= "box barrier"></div>`)
+                $(".barrier").css({
+                    "background-img": `url(./拼图图片/hs.jpg)`,
+                    height: 600 / steps,
+                    width: 600 / steps,
+                    top: getPointY(steps * steps, steps),
+                    left: getPointX(steps * steps, steps),
+                })
+
+                //小盒子重新定位函数(确保节点与其相对位置对应)
+                let change = function () {
+                    for (let i = 0; i < $(".box").length; i++) {
+                        $(".box")
+                            .eq(i)
+                            .css({
+                                top: getPointY(i + 1, steps),
+                                left: getPointX(i + 1, steps),
+                            })
+                    }
+                }
+                //键盘交互
+                //按键'上'交互函数
+                let up = function () {
+                    $(".box")
+                        .eq($(".barrier").index() + steps)
+                        .after($(".barrier"))
+                    $(".box")
+                        .eq($(".barrier").index() - steps)
+                        .before($(".barrier").prev())
+                    $(".record span").text(yourSteps++)
+                }
+                //按键'下'交互函数
+                let down = function () {
+                    $(".box")
+                        .eq($(".barrier").index() - steps)
+                        .before($(".barrier"))
+                    $(".box")
+                        .eq($(".barrier").index() + steps)
+                        .after($(".barrier").next())
+                    $(".record span").text(yourSteps++)
+                }
+                //按键'左'交互函数
+                let left = function () {
+                    $(".barrier").next().after($(".barrier"))
+                    $(".record span").text(yourSteps++)
+                }
+                //按键'右'交互函数
+                let right = function () {
+                    $(".barrier").prev().before($(".barrier"))
+                    $(".record span").text(yourSteps++)
+                }
+
+                //图片打乱
+                let ran
+                let ranArr = []
+                for (let i = 0; i < 5 * steps * steps; i++) {
+                    ran = parseInt(Math.random() * 4)
+                    if (ran == 0) {
+                        up()
+                    }
+                    if (ran == 1) {
+                        down()
+                    }
+                    if (ran == 2) {
+                        left()
+                    }
+                    if (ran == 3) {
+                        right()
+                    }
+                    ranArr.push(ran)
+                }
+                console.log(ranArr)
+                change()
+                yourSteps = 0
+                $(".record span").text(yourSteps)
+                $(".hack").on("click", function () {
+                    ranArr.reverse()
+                    ranArr.forEach(item => {
+                        if (item == 0) {
+                            down()
+                        }
+                        if (item == 1) {
+                            up()
+                        }
+                        if (item == 2) {
+                            right()
+                        }
+                        if (item == 3) {
+                            left()
+                        }
+                    })
+                    change()
+                })
+                //主体交互
+                if (once) {
+                    $(window).on("keydown", "", function (e) {
+                        if (e.keyCode == 39 && $(".barrier").prev() && $(".barrier").index() % steps != 0) {
+                            right()
+                            change()
+                        }
+                        if (e.keyCode == 37 && $(".barrier").next() && $(".barrier").index() % steps != steps - 1) {
+                            left()
+                            change()
+                        }
+                        if (e.keyCode == 40 && $(".barrier").prev().prev().prev() && $(".barrier").index() >= steps) {
+                            down()
+                            change()
+                        }
+                        if (
+                            e.keyCode == 38 &&
+                            $(".barrier").next().next().next() &&
+                            $(".barrier").index() <= steps * (steps - 1) - 1
+                        ) {
+                            up()
+                            change()
+                        }
+
+                        //判断拼图顺序正确（理论方案：遍历方块，判断自定义属性的顺序）
+                        let arr = []
+                        for (let i = 0; i < $(".box").length; i++) {
+                            arr.push($(".box").eq(i).attr("data-rank"))
+                        }
+                        let rank = [...arr]
+                        let isOk = arr.sort(function (a, b) {
+                            return a - b
+                        })
+                        if (rank.toString() == isOk.toString()) {
+                            alert("成功")
+                        }
+                    })
+                }
+                once = false
+            }
+        </script>
+    </body>
+</html>

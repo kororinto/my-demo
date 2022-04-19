@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            cursor: default;
+        }
+
+        button {
+            bottom: none;
+            background-color: transparent;
+            outline: none;
+            border: 1px solid #333;
+            width: 80px;
+            height: 40px;
+            border-radius: 5px;
+            position: absolute;
+            left: 50%;
+            bottom: 20px;
+            font-size: 16px;
+            font-weight: 600;
+            transform: translate(-50%);
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: hsla(195, 100%, 50%, .5);
+        }
+
+        #tetris {
+            display: block;
+            border: 1px solid #333;
+            margin: 50px auto 0;
+        }
+
+        #board {
+            position: absolute;
+            top: 50px;
+            left: 50%;
+            transform: translateX(240px);
+            font-size: 25px;
+            font-weight: 500;
+        }
+
+        #next {
+            display: block;
+            position: absolute;
+            top: 160px;
+            left: 50%;
+            width: 160px;
+            transform: translateX(240px);
+        }
+
+        #game_over {
+            display: none;
+            position: absolute;
+            background-color: #fff;
+            opacity: 0.7;
+            border-radius: 8px;
+            top: 30%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border: 1px solid #333;
+            width: 300px;
+            height: 200px;
+            line-height: 100px;
+            font-weight: 600;
+            font-size: 25px;
+            text-align: center;
+            letter-spacing: 10px;
+            z-index: 2;
+        }
+
+        #game_over span {
+            position: relative;
+            top: -50px;
+        }
+
+        #cloak {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, .7);
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="tetris" width="400" height="800"></canvas>
+    <div id="board">
+        得分：<span class="score">0</span><br><br>
+        下一个：
+    </div>
+    <canvas id="next" width="240" height="240"></canvas>
+    <div id="game_over">
+        游 戏 结 束<br>
+        <span>得分：</span><span class="score">0</span>
+        <button id="again">再来一次</button>
+    </div>
+    <div id="cloak"></div>
+    <script>
+        // 请求关键帧动画 window.requestAnimationFrame(fn)
+        const canvas = document.querySelector('#tetris')
+        const context = canvas.getContext('2d')
+        const score = document.querySelectorAll('.score')
+        const againBtn = document.querySelector('#again')
+        const gameOver = document.querySelector('#game_over')
+        const cloak = document.querySelector('#cloak')
+        const ROW = 20 // 行数
+        const COLUMN = 10 // 列数
+        const singleBlockWidth = canvas.clientWidth / COLUMN // 单个方块大小
+        const LINEWIDTH = 4 // 方块边框大小
+        const SPEED = 1 // 游戏速度 默认1 方块1s下落一次
+        context.fillStyle = '#eee'
+        context.strokeStyle = '#666'
+        let thisBlock = [] // 当前正在运动的方块
+        let thisBlockType = [] // 当前正在运动的方块的类型
+        let fixedBlocks = [] // 存放已固定的方块
+        let filledGirds = [] // 已填充颜色的格子
+        let nextBlock = [] // 下一个方块
+        let nextBlockType = [] // 下一个方块类型
+
+        document.addEventListener('selectstart', e => e.preventDefault())
+
+        const gameStart = () => {
+            gamingTimer = setInterval(refreshFrame, 1000 / SPEED)
+            document.addEventListener('keydown', onKeyDown)
+            gameOver.style.display = 'none'
+            cloak.style.display = 'none'
+            score[0].innerHTML = 0
+            score[1].innerHTML = 0
+            // 重绘画布
+            context.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight)
+            fixedBlocks = []
+            filledGirds = []
+            refreshFrame()
+            refreshNext()
+        }
+        againBtn.addEventListener('click', gameStart)
+
+        const drawBackground = () => {
+            for (let i = 0; i < COLUMN; i++) {
+                for (let j = 0; j < ROW; j++) {
+                    context.fillRect(i * singleBlockWidth, j * singleBlockWidth, singleBlockWidth, singleBlockWidth)
+                    context.strokeRect(i * singleBlockWidth, j * singleBlockWidth, singleBlockWidth, singleBlockWidth)
+                }
+            }
+        }
+        drawBackground()
+
+        const blockTypes = [ // 每个数组代表一个初始方块种类
+            [0, 0, 0, 1, -1, 1, -1, 2], // 正Z型
+            [-2, 0, -1, 0, -1, 1, 0, 1],
+            [0, 0, 0, 1, 1, 1, 1, 2], // 反Z型
+            [0, 0, 1, 0, 0, 1, -1, 1],
+            [0, 0, -1, 1, 0, 1, 1, 1], // 土字型
+            [0, 0, 0, 1, 1, 1, 0, 2],
+            [-1, 1, 0, 1, 1, 1, 0, 2],
+            [0, 0, 0, 1, -1, 1, 0, 2],
+            [0, 0, 1, 0, 0, 1, 1, 1], // 田字型
+            [0, 0, 0, 1, 0, 2, 1, 2], // 正L型
+            [-1, 0, 0, 0, 1, 0, -1, 1],
+            [-1, 0, 0, 0, 0, 1, 0, 2],
+            [1, 0, -1, 1, 0, 1, 1, 1],
+            [0, 0, 0, 1, 0, 2, -1, 2], // 反L型
+            [-1, 0, -1, 1, 0, 1, 1, 1],
+            [1, 0, 0, 0, 0, 1, 0, 2],
+            [1, 2, -1, 1, 0, 1, 1, 1],
+            [0, 0, 1, 0, 2, 0, 3, 0], // 一字型
+            [2, -2, 2, -1, 2, 0, 2, 1]
+        ]
+        const getRandom = () => {
+            let random = getRandomIntInclusive(0, 6)
+            switch (random) {
+                case 0:
+                    random = getRandomIntInclusive(0, 1)
+                    break
+                case 1:
+                    random = getRandomIntInclusive(2, 3)
+                    break
+                case 2:
+                    random = getRandomIntInclusive(4, 7)
+                    break
+                case 3:
+                    random = 8
+                    break
+                case 4:
+                    random = getRandomIntInclusive(9, 12)
+                    break
+                case 5:
+                    random = getRandomIntInclusive(13, 16)
+                    break
+                case 6:
+                    random = getRandomIntInclusive(17, 18)
+                    break
+                default:
+                    break
+            }
+            return random
+        }
+
+        // 生成一种方块
+        const createBlock = (block, isNext) => {
+            // thisBlock = []
+            if (block) return block
+            // 随机生成x值
+            let x = getRandomIntInclusive(0, COLUMN)
+            // 随机获取一种类型并向右平移 随机生成的x个格子 并检查边界和出现时的最低y值
+            if (isNext) {
+                nextBlockType = blockTypes[getRandom()]
+                block = initBlock(nextBlockType.map((item, index) => index % 2 ? item : item + x))
+            } else {
+                thisBlockType = blockTypes[getRandom()]
+                block = initBlock(thisBlockType.map((item, index) => index % 2 ? item : item + x))
+            }
+
+            // 生成随机种类且随机旋转的方块
+            return block
+        }
+
+        // 根据方块形状 限制边界和初始高度
+        const initBlock = (type) => {
+            let xArr = []
+            let yArr = []
+            type.forEach((item, index) => {
+                if (index % 2) {
+                    yArr.push(item)
+                } else {
+                    xArr.push(item)
+                }
+            })
+            let maxX = Math.max(...xArr) // 获取最大的X坐标
+            let minX = Math.min(...xArr) // 获取最小的X坐标
+            let maxY = Math.max(...yArr) // 获取最大的Y坐标
+            // todo:旋转
+
+            return type.map((item, index) => {
+                // 当最大的横坐标超出边界时，向左平移 maxX - COLUMN + 1
+                // 当最小的横坐标超出边界时，向右平移 - minX
+                if (!(index % 2)) {
+                    if (maxX > 9) return item - maxX + COLUMN - 1
+                    if (minX < 0) return item - minX
+                    return item
+                }
+                // 让方块的最低层出现在y=0的位置
+                // 即 让最大的y值为0 其余向上平移
+                else {
+                    return item - maxY
+                }
+                return item
+            })
+        }
+
+        const getRandomIntInclusive = (min, max) => {
+            return Math.floor(Math.random() * (max - min + 1)) + min //含最大值，含最小值 
+        }
+
+        const isReachTheBottom = block => {
+            let bottomArr = getLimitBottom(block)
+            // 方块所占的每个列都不能大于等于这列的最小y值
+            for (let i = 0; i < block.length; i += 2) {
+                bottomArr[bottomArr.findIndex(item => item.x == block[i])].y
+            }
+            return block.some((item, index) => index % 2 ? false : bottomArr[bottomArr.findIndex(item2 => item2.x == item)].y <= block[index + 1] + 1)
+        }
+
+        const drawBlock = (blocks) => {
+            context.save()
+            context.fillStyle = 'hsla(195,100%,50%,.5)'
+            context.strokeStyle = 'hsla(200,100%,50%,.6)'
+            context.lineWidth = LINEWIDTH
+            if (blocks[0] instanceof Array) {  // 绘制已固定的方块
+                blocks.forEach(item => {
+                    // 绘制方块
+                    for (let i = 0; i < item.length; i += 2) {
+                        context.fillRect(item[i] * singleBlockWidth, item[i + 1] * singleBlockWidth, singleBlockWidth, singleBlockWidth)
+                        context.strokeRect(item[i] * singleBlockWidth + LINEWIDTH / 4, item[i + 1] * singleBlockWidth + LINEWIDTH / 4, singleBlockWidth - LINEWIDTH / 2, singleBlockWidth - LINEWIDTH / 2)
+                    }
+                })
+            } else { // 绘制当前正在移动的方块
+                // 绘制方块
+                for (let i = 0; i < blocks.length; i += 2) {
+                    context.fillRect(blocks[i] * singleBlockWidth, blocks[i + 1] * singleBlockWidth, singleBlockWidth, singleBlockWidth)
+                    context.strokeRect(blocks[i] * singleBlockWidth + LINEWIDTH / 4, blocks[i + 1] * singleBlockWidth + LINEWIDTH / 4, singleBlockWidth - LINEWIDTH / 2, singleBlockWidth - LINEWIDTH / 2)
+                    thisBlock.push(blocks[i], blocks[i + 1])
+                }
+            }
+            context.restore()
+        }
+
+        // 对比1格~10格的最小y坐标, block每个小块不能大于等于该格上的最小y值
+        const getLimitBottom = (block) => {
+            let yArr = new Array() // 存放每格的所有y值
+            let minYArr = [] // 存放1格~10格的最小y值
+            let bottomArr = [] // 方块所占列的最小y值
+            for (let i = 0; i < COLUMN; i++) {
+                yArr[i] = new Array()
+            }
+            // 取出所有y值存入yArr
+            for (let i = 0; i < fixedBlocks.length; i++) {
+                for (let j = 0; j < fixedBlocks[i].length; j += 2) {
+                    yArr[fixedBlocks[i][j]].push(fixedBlocks[i][j + 1])
+                }
+            }
+            let selfYArr = []
+            for (let i = 0; i < block.length; i += 2) {
+                selfYArr.push({ x: block[i], y: block[i + 1] })
+            }
+            let selfMaxY = []
+            // 获取该方块最下面的y值
+            selfYArr.forEach(item => {
+                let sameXindex = selfMaxY.findIndex(item3 => item3.x == item.x)
+                if (sameXindex !== -1) {
+                    selfMaxY[sameXindex].y = Math.max(selfMaxY[sameXindex].y, item.y)
+                } else {
+                    selfMaxY.push(item)
+                }
+            })
+            // 取出最小y值存入minYArr 且下标对应格子数x
+            yArr.forEach((item, index) => {
+                let selfThisXMaxY
+                if (selfMaxY.find(item => item.x == index)) {
+                    selfThisXMaxY = selfMaxY.find(item => item.x == index).y
+                } else {
+                    selfThisXMaxY = ROW
+                }
+                let isPassed = 0
+                if (item.length == 0 || item.filter(item2 => item2 > selfThisXMaxY).length == 0) {
+                    minYArr.push(ROW)
+                }
+                else {
+                    // minYArr.push(item.filter(item2 => item2 > selfMaxY).length ? Math.min(...item.filter(item2 => item2 > selfMaxY)) : ROW)
+                    // console.log(...item.filter(item2 => item2 > selfMaxY))
+                    minYArr.push(Math.min(...item.filter(item2 => item2 > selfThisXMaxY)))
+                }
+            })
+            // 方块所占的列上的最小y值(不能小于自己)
+            for (let i = 0; i < block.length; i += 2) {
+                let index = bottomArr.findIndex(item => item.x == block[i])
+                // 如果已存过该x格的最小y值 则更新到最小
+                if (bottomArr.length != 0 && bottomArr.findIndex(item => item.x == block[i]) != -1) {
+                    if (Math.min(bottomArr[index].y, minYArr[block[i]]) <= selfMaxY) {
+                        continue
+                    }
+                    bottomArr[index].y = Math.min(bottomArr[index].y, minYArr[block[i]])
+                }
+                else {
+                    if (minYArr[block[i]] <= selfMaxY) {
+                        bottomArr.push({ x: block[i], y: ROW })
+                        continue
+                    }
+                    bottomArr.push({ x: block[i], y: minYArr[block[i]] })
+                }
+            }
+            return bottomArr
+        }
+
+        const onKeyDown = e => {
+            // 37 左箭头 左移
+            // 39 右箭头 右移
+            // 38 上箭头 旋转
+            // 40 下箭头 下移
+            // 32/13 回车/空格 直接下落
+            switch (e.keyCode) {
+                case 37: moveBlock(-1)
+                    break
+                case 39: moveBlock(1)
+                    break
+                case 38: rotateBlock()
+                    break
+                case 40:
+                    downBlock()
+                    refreshBackground()
+                    break
+                case 32:
+                case 13: dropBlock()
+                    break
+                default:
+                    break
+            }
+        }
+
+        const moveBlock = d => {
+            let xArr = thisBlock.filter((item, index) => !(index % 2))
+            filledGirds = []
+            // 获取所有已填充的格子 界面攻 0-9 * 0-19 200格
+            for (let i = 0; i < fixedBlocks.length; i++) {
+                for (let j = 0; j < fixedBlocks[i].length; j += 2) {
+                    filledGirds.push([fixedBlocks[i][j], fixedBlocks[i][j + 1]])
+                }
+            }
+            let gridArr = [{}, {}, {}, {}]
+            // 该方块的所有格子移动后不能占已有的格子
+            for (let i = 0; i < thisBlock.length; i += 2) {
+                gridArr[i / 2].y = thisBlock[i + 1]
+                gridArr[i / 2].x = []
+                filledGirds.forEach(item => {
+                    if (item[1] == thisBlock[i + 1]) {
+                        gridArr[i / 2].x.push(item[0])
+                    }
+                })
+            }
+            let cantMove
+            if (d > 0) {
+                // console.log(gridArr)
+                gridArr.forEach(item => {
+                    for (let i = 0; i < thisBlock.length; i += 2) {
+                        if (thisBlock[i + 1] == item.y) {
+                            // console.log(thisBlock[i])
+                            if (item.x.some(e => e == thisBlock[i] + 1)) {
+                                cantMove = true
+                            }
+                        }
+                    }
+                })
+                if (cantMove) return
+            }
+            if (d < 0) {
+                gridArr.forEach(item => {
+                    for (let i = 0; i < thisBlock.length; i += 2) {
+                        if (thisBlock[i + 1] == item.y) {
+                            if (item.x.some(e => e == thisBlock[i] - 1)) {
+                                cantMove = true
+                            }
+                        }
+                    }
+                })
+                if (cantMove) return
+            }
+
+            // 没有达到左右边界时才可移动
+            if (Math.min(...xArr) > 0 && d < 0 || Math.max(...xArr) < COLUMN - 1 && d > 0) {
+                thisBlock = thisBlock.map((item, index) => index % 2 ? item : item + d)
+                refreshBackground()
+            }
+        }
+
+        const rotateBlock = () => {
+            // console.log(thisBlockType)
+            // 找到该方块种类在初始种类中的位置, 再往后推一个元素并位移到该方块处
+            let index = blockTypes.findIndex((item, index) => item.every((item2, index2) => item2 == thisBlockType[index2]))
+            // 算出x方向y方向偏移量
+            let deltaX = thisBlock[0] - blockTypes[index][0]
+            let deltaY = thisBlock[1] - blockTypes[index][1] - 1
+            // console.log(index)
+            switch (index) {
+                case 0:
+                case 1:
+                    index = (index + 1) % 2
+                    break
+                case 2:
+                case 3:
+                    index = (index + 1) % 2 + 2
+                    break
+                case 4:
+                case 5:
+                case 6:
+                case 7:
+                    index = (index + 1) % 4 + 4
+                    break
+                case 8:
+                    break
+                case 9:
+                case 10:
+                case 11:
+                case 12:
+                    index = index % 4 + 9
+                    break
+                case 13:
+                case 14:
+                case 15:
+                case 16:
+                    index = index % 4 + 13
+                    break
+                case 17:
+                case 18:
+                    index = index % 2 + 17
+                    break
+            }
+            let newBlock = blockTypes[index].map((item, index) => index % 2 ? item + deltaY : item + deltaX)
+            let xArr = newBlock.filter((item, index) => !(index % 2))
+            // 如果旋转后超出边界则移至边界
+            if (Math.min(...xArr) < 0) {
+                newBlock = newBlock.map((item, index) => index % 2 ? item : item - Math.min(...xArr))
+            }
+            if (Math.max(...xArr) > COLUMN - 1) {
+                newBlock = newBlock.map((item, index) => index % 2 ? item : item - Math.max(...xArr) + COLUMN - 1)
+            }
+            let cantRotate = false
+            let allXY = []
+            fixedBlocks.forEach(item => {
+                allXY.push(...item)
+            })
+            // 如果旋转后碰到其他方块移至边缘，如果放不下旋转后的方块则不旋转
+            for (let i = 0; i < newBlock.length; i += 2) {
+                allXY.forEach((item, index) => {
+                    if (!(index % 2) && item == newBlock[i] && allXY[index + 1] == newBlock[i + 1]) {
+                        cantRotate = true
+                    }
+                })
+                if (cantRotate) return
+            }
+            thisBlock = newBlock
+            thisBlockType = blockTypes[index]
+            refreshFrame()
+        }
+
+        const downBlock = () => {
+            let bottomArr = getLimitBottom(thisBlock)
+            // 方块所占的每个列都不能大于等于这列的最小值
+            let flag = thisBlock.some((item, index) => index % 2 ? false : bottomArr[bottomArr.findIndex(item2 => item2.x == item)].y <= thisBlock[index + 1] + 1)
+            if (!flag) { // 没有达到下边界时才可以向下移动
+                thisBlock = thisBlock.map((item, index) => index % 2 ? ++item : item)
+            }
+        }
+
+        const dropBlock = () => {
+            let bottomArr = getLimitBottom(thisBlock)
+            let flag = thisBlock.some((item, index) => index % 2 ? false : bottomArr[bottomArr.findIndex(item2 => item2.x == item)].y <= thisBlock[index + 1] + 1)
+            while (!flag) {
+                flag = thisBlock.some((item, index) => index % 2 ? false : bottomArr[bottomArr.findIndex(item2 => item2.x == item)].y <= thisBlock[index + 1] + 1)
+                downBlock()
+            }
+            refreshFrame()
+        }
+
+        const refreshBackground = () => {
+            context.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight)
+            drawBackground() // 绘制背景
+            drawBlock(fixedBlocks) // 绘制已有的方块
+            let temp = thisBlock.slice(0)
+            thisBlock = []
+            drawBlock(createBlock(temp)) // 绘制当前方块
+        }
+
+        const refreshFrame = () => {
+            let allXY = []
+            fixedBlocks.forEach(item => {
+                allXY.push(...item)
+            })
+            // 游戏结束
+            if (allXY.some((item, index) => index % 2 ? item < 0 : false)) {
+                clearTimeout(gamingTimer)
+                document.removeEventListener('keydown', onKeyDown)
+                showGameOver()
+            }
+            context.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight)
+            drawBackground() // 绘制背景
+            if (thisBlock.length == 0) { // 没有方块移动时新增一个方块
+                thisBlock = []
+                drawBlock(createBlock())
+                nextBlock = createBlock(null, true)
+            }
+            // 方块到底时，存入fixedBlocks并绘制以固定的方块同时新增一个方块
+            else if (isReachTheBottom(thisBlock)) {
+                fixedBlocks.push(thisBlock)
+                // 满一行消除
+                let rowX = []
+                for (let i = 0; i < ROW; i++) {
+                    rowX[i] = { y: i, x: [] }
+                }
+                let allXY = []
+                fixedBlocks.forEach(item => {
+                    allXY.push(...item)
+                })
+                allXY.forEach((item, index) => {
+                    if (index % 2) {
+                        rowX[rowX.findIndex(item2 => item2.y == item)] != undefined && rowX[rowX.findIndex(item2 => item2.y == item)].x.push(allXY[index - 1])
+                    }
+                })
+                rowX.forEach(item => {
+                    if (item.x.length == COLUMN) {
+                        let removeY = item.y
+                        for (let i = 0; i < allXY.length; i += 2) {
+                            if (allXY[i + 1] == item.y) {
+                                allXY[i] = 'remove'
+                                allXY[i + 1] = 'remove'
+                            }
+                        }
+                        allXY = allXY.filter(item => item != 'remove')
+                        allXY = allXY.map((item, index) => index % 2 ? (item < removeY ? item + 1 : item) : item)
+                        fixedBlocks = []
+                        for (let i = 0; i < allXY.length; i += 2) {
+                            fixedBlocks.push([allXY[i], allXY[i + 1]])
+                        }
+                        score[0].innerHTML = +score[0].innerHTML + 10
+                        score[1].innerHTML = +score[1].innerHTML + 10
+                    }
+                })
+                thisBlock = []
+                drawBlock(fixedBlocks)
+                thisBlockType = nextBlockType
+                drawBlock(nextBlock)
+                nextBlock = createBlock(null, true)
+                refreshNext()
+            } else {
+                thisBlock = thisBlock.map((item, index) => index % 2 ? item + 1 : item)
+                drawBlock(fixedBlocks)
+                let temp = thisBlock.slice(0)
+                thisBlock = []
+                drawBlock(createBlock(temp))
+            }
+        }
+        const showGameOver = () => {
+            gameOver.style.display = 'block'
+            cloak.style.display = 'block'
+        }
+        document.addEventListener('keydown', onKeyDown)
+
+        let gamingTimer = setInterval(refreshFrame, 1000 / SPEED)
+
+        // 显示下一个方块的画布
+        const canvas2 = document.querySelector('#next')
+        const context2 = canvas2.getContext('2d')
+        context2.fillStyle = 'hsla(195,100%,50%,.5)'
+        context2.strokeStyle = 'hsla(200,100%,50%,.6)'
+        context2.lineWidth = LINEWIDTH
+        const refreshNext = () => {
+            context2.clearRect(0, 0, +canvas2.getAttribute('width'), +canvas2.getAttribute('height'))
+            let block = nextBlockType.map((item, index) => index % 2 ? item - nextBlockType[1] + 2 : item - nextBlockType[0] + 2)
+            for (let i = 0; i < block.length; i += 2) {
+                context2.fillRect(block[i] * singleBlockWidth, block[i + 1] * singleBlockWidth, singleBlockWidth, singleBlockWidth)
+                context2.strokeRect(block[i] * singleBlockWidth + LINEWIDTH / 4, block[i + 1] * singleBlockWidth + LINEWIDTH / 4, singleBlockWidth - LINEWIDTH / 2, singleBlockWidth - LINEWIDTH / 2)
+            }
+        }
+        refreshFrame()
+        refreshNext()
+    </script>
+</body>
+
+</html>

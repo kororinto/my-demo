@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Document</title>
+    </head>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: skyblue;
+        }
+
+        .box {
+            position: absolute;
+            display: flex;
+            left: 50%;
+            top: 40%;
+            transform: translate(-50%, -50%);
+            background-color: #fff;
+            width: 600px;
+            height: 60px;
+            border-radius: 30px;
+            padding: 5px 15px;
+        }
+
+        .arrows {
+            flex: 1;
+            line-height: 50px;
+            font-size: 40px;
+            font-weight: 1100;
+            text-align: center;
+        }
+
+        .passed {
+            color: rgb(80, 253, 0);
+        }
+
+        .nopassed {
+            color: #000;
+        }
+
+        .error {
+            color: red;
+        }
+
+        .progress_bar {
+            position: absolute;
+            width: 150px;
+            height: 14px;
+            right: 30px;
+            top: -18px;
+            border-radius: 7px;
+            background-color: #fff;
+            border: 1px solid tomato;
+        }
+
+        .progress_dot {
+            position: absolute;
+            left: 1px;
+            top: 1px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: tomato;
+            transition: background 0.25s;
+        }
+
+        .perfect {
+            position: absolute;
+            height: 12px;
+            top: 0;
+            right: 30px;
+            line-height: 12px;
+            font-size: 12px;
+            font-weight: 700;
+            color: red;
+        }
+
+        .miss {
+            color: red;
+            position: absolute;
+            font-size: 16px;
+            font-weight: 700;
+            top: -40px;
+            right: -10px;
+            transform: rotate(-30deg);
+            opacity: 0;
+            transition: opacity 0.25s;
+        }
+
+        .pass {
+            color: greenyellow;
+            position: absolute;
+            font-size: 16px;
+            font-weight: 700;
+            top: -40px;
+            right: -10px;
+            transform: rotate(-30deg);
+            opacity: 0;
+            transition: opacity 0.25s;
+        }
+
+        .stop {
+            position: absolute;
+            bottom: -20px;
+            left: 0;
+            width: 0%;
+            height: 4px;
+            border-radius: 2px;
+            background-color: tomato;
+        }
+        .params_btn {
+            width: 100px;
+            height: 40px;
+            background-color: red;
+            position: absolute;
+            left: 50%;
+            bottom: 40%;
+            transform: translate(-50%);
+            /*  */
+            display: none;
+        }
+    </style>
+
+    <body>
+        <div class="params_btn"></div>
+        <div class="box">
+            <div class="progress_bar">
+                <i class="progress_dot"></i>
+                <div class="perfect">I</div>
+            </div>
+            <div class="miss">miss</div>
+            <div class="pass">pass</div>
+            <div class="stop"></div>
+        </div>
+    </body>
+    <script>
+        window.addEventListener("load", () => {
+            let box = document.querySelector(".box")
+            let num = undefined // 控制箭头个数
+            let time = undefined // 控制倒计时条
+            if (localStorage.getItem("num") && localStorage.getItem("num") != "undefined") {
+                num = +localStorage.getItem("num")
+            } else {
+                num = 5
+            }
+            if (localStorage.getItem("time") && localStorage.getItem("time") != "undefined") {
+                time = +localStorage.getItem("time")
+            } else {
+                time = 3
+            }
+            let arrowsArray = ["↑", "↓", "←", "→"]
+            for (let i = 0; i < num; i++) {
+                let span = document.createElement("span")
+                // Math.floor(Math.random() * (max - min + 1)) + min; //含最大值，含最小值
+                let index = Math.floor(Math.random() * 4)
+                span.innerHTML = arrowsArray[index]
+                span.classList = "arrows nopassed"
+                box.appendChild(span)
+            }
+            // 倒计时条开始运动
+            const countDownMove = () => {
+                let dot = document.querySelector(".progress_dot")
+                let bar = document.querySelector(".progress_bar")
+                let end = bar.clientWidth - dot.clientWidth - (bar.offsetWidth - bar.clientWidth) / 2
+                uniformLinearMotion(dot, 1, end, time, true)
+            }
+
+            // 键盘按键事件的回调函数, 检验是否按对, 错误重新开始, 正确则检验下一个
+            const checkKey = (e) => {
+                let nextArrow = document.querySelector(".nopassed")
+                let dot = document.querySelector(".progress_dot")
+                let bar = document.querySelector(".progress_bar")
+                if (e.keyCode == 32) {
+                    let perfect = bar.offsetWidth * 0.8
+                    let nowtime = dot.offsetLeft + dot.offsetWidth / 2 + 2
+                    if (nextArrow == undefined && perfect - 8 <= nowtime && nowtime <= perfect + 8) {
+                        // 重新生成一列随机箭头
+                        showPass()
+                        newKeys()
+                        return
+                    } else {
+                        let nopassedArrows = document.querySelectorAll(".nopassed")
+                        for (let i = 0; i < nopassedArrows.length; i++) {
+                            nopassedArrows[i].classList = "arrows error"
+                        }
+                        missKey()
+                        return
+                    }
+                }
+                if (nextArrow == undefined) {
+                    // 重新生成一列随机箭头
+                    return
+                }
+                let nextArrowHTML = nextArrow.innerHTML
+                let nextArrowValue = undefined
+                switch (nextArrowHTML) {
+                    case "↑":
+                        nextArrowValue = 38
+                        break
+                    case "↓":
+                        nextArrowValue = 40
+                        break
+                    case "←":
+                        nextArrowValue = 37
+                        break
+                    case "→":
+                        nextArrowValue = 39
+                        break
+                    default:
+                        break
+                }
+                if (e.keyCode == nextArrowValue) {
+                    nextArrow.classList = "arrows passed"
+                } else {
+                    nextArrow.classList = "arrows error"
+                    missKey()
+                }
+            }
+
+            // 按键错误执行的函数
+            const missKey = () => {
+                window.removeEventListener("keydown", checkKey)
+                showMiss()
+                setTimeout(() => {
+                    let allArrows = document.querySelectorAll(".arrows")
+                    for (let i = 0; i < allArrows.length; i++) {
+                        allArrows[i].classList = "arrows nopassed"
+                    }
+                    window.addEventListener("keydown", checkKey)
+                }, 500)
+            }
+
+            // 闪现miss字样
+            const showMiss = () => {
+                // 闪现miss字样
+                document.querySelector(".miss").style.opacity = 1
+                errorProgess()
+                setTimeout(() => {
+                    document.querySelector(".miss").style.opacity = 0
+                }, 250)
+            }
+
+            // 闪现pass字样
+            const showPass = () => {
+                let pass = document.querySelector(".pass")
+                let dot = document.querySelector(".progress_dot")
+                // 闪现pass字样
+                pass.style.opacity = 1
+                dot.style.backgroundColor = "#FFF"
+                dot.style.width = "16px"
+                dot.style.height = "16px"
+                dot.style.top = "-2px"
+                setTimeout(() => {
+                    pass.style.opacity = 0
+                    dot.style.backgroundColor = "tomato"
+                    dot.style.width = "10px"
+                    dot.style.height = "10px"
+                    dot.style.top = "1px"
+                }, 250)
+            }
+
+            // 闪现下方进度条
+            const errorProgess = () => {
+                let zip = document.querySelector(".stop")
+                zip.style.transition = "width 0.5s"
+                zip.style.width = "100%"
+                setTimeout(() => {
+                    zip.style.transition = ""
+                    zip.style.width = "0%"
+                }, 500)
+            }
+
+            // 提前按下空格则全部清空的函数
+            const newKeys = () => {
+                let allArrows = document.querySelectorAll(".arrows")
+                if (allArrows == undefined) return
+                // 清空箭头
+                for (let i = 0; i < allArrows.length; i++) {
+                    box.removeChild(allArrows[i])
+                }
+                // 重新生成
+                for (let i = 0; i < num; i++) {
+                    let span = document.createElement("span")
+                    // Math.floor(Math.random() * (max - min + 1)) + min; //含最大值，含最小值
+                    let index = Math.floor(Math.random() * 4)
+                    span.innerHTML = arrowsArray[index]
+                    span.classList = "arrows nopassed"
+                    box.appendChild(span)
+                }
+            }
+
+            // 匀速运动函数 el: dom元素   start: 起始位置   end: 结束位置   time: 运动时间   isRepetition: 是否循环
+            const uniformLinearMotion = (el, start, end, time, isRepetition) => {
+                let px_s = Math.abs((start - end) / time) // 每秒要移动的像素值
+                let n = 50 // 帧数, 由于浏览器性能, 不能太大
+                let now = start
+                let timer = setInterval(() => {
+                    el.style.left = now + px_s / n + "px"
+                    now += px_s / n
+                    if (el.offsetLeft >= end) {
+                        if (!isRepetition) clearInterval(timer)
+                        else {
+                            // 循环播放
+                            el.style.left = start + "px"
+                            now = start
+                        }
+                    }
+                }, 1000 / n)
+            }
+
+            window.addEventListener("keydown", checkKey)
+            countDownMove()
+        })
+    </script>
+</html>

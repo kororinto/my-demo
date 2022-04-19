@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <!-- 3. 前端游戏框架
+
+            cocos2d-html5
+
+            Egret Engine
+
+            LimeJS
+
+            EaselJS
+
+            three.js
+
+            AlloyStick
+
+            The-Best-JS-Game-Framework
+
+            CanvasEngine
+
+            Quintus 
+    -->
+  </head>
+  <style>
+    * {
+      padding: 0;
+      margin: 0;
+      box-sizing: border-box;
+    }
+
+    #container {
+      position: relative;
+      background-color: #ccc;
+      overflow: hidden;
+      -moz-user-select: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+  </style>
+
+  <body>
+    <div id="container"></div>
+    <script>
+      let windowWidth = window.innerWidth
+      let windowHeight = window.innerHeight
+      const container = document.querySelector("#container")
+      let timerArr = []
+      const maxWidth = 80
+      const maxHeight = 80
+      let score = 0
+      let missTimes = 0
+      initGame()
+
+      function initGame() {
+        resizeContainer()
+        window.addEventListener("resize", resizeContainer)
+        setInterval(aimCreater, 500)
+        container.addEventListener("mousedown", aimBoosted)
+      }
+
+      // 浏览器窗口变化重置container宽高
+      function resizeContainer() {
+        windowWidth = window.innerWidth
+        windowHeight = window.innerHeight
+        container.style.width = windowWidth + "px"
+        container.style.height = windowHeight + "px"
+      }
+
+      // 生成aim
+      function aimCreater() {
+        let newAim = document.createElement("div")
+        newAim.style.width = 1 + "px"
+        newAim.style.height = 1 + "px"
+        newAim.style.borderRadius = "50%"
+        newAim.style.backgroundColor = "red"
+        newAim.style.border = "1px solid #fff"
+        newAim.style.position = "absolute"
+        container.appendChild(newAim)
+        newAim.style.left = getRandomInteger(maxWidth / 2, windowWidth - maxWidth / 2) + "px"
+        newAim.style.top = getRandomInteger(maxHeight / 2, windowHeight - maxHeight / 2) + "px"
+        newAim.style.transform = "translate(-50%, -50%)"
+        let speed = 1
+        let timer = setInterval(function () {
+          if (newAim.offsetWidth >= maxWidth) speed = -speed
+          newAim.style.width = newAim.offsetWidth + speed + "px"
+          newAim.style.height = newAim.offsetHeight + speed + "px"
+          if (newAim.offsetWidth <= 2 && speed === -1) {
+            let pos = timerArr.findIndex((item) => item.aim === newAim)
+            timerArr[pos].aim = null // 置空该aim对象
+            clearInterval(timerArr[pos].timer) // 清空该定时器
+            timerArr.splice(pos, 1) // 删除该数组元素
+            container.removeChild(newAim) // 删除该节点
+          }
+        }, 50)
+        timerArr.push({
+          aim: newAim,
+          timer,
+        })
+      }
+
+      // 得到一个[max,min]区间的任意整数
+      function getRandomInteger(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min
+      }
+
+      // 点击aim
+      function aimBoosted(e) {
+        console.clear()
+        console.log("                      得分                      失误")
+        if (e.target === container) {
+          console.log(`                      ${score}                      ${++missTimes}`)
+          return
+        }
+        let pos = timerArr.findIndex((item) => item.aim === e.target)
+        timerArr[pos].aim = null // 置空该aim对象
+        clearInterval(timerArr[pos].timer) // 清空该定时器
+        timerArr.splice(pos, 1) // 删除该数组元素
+        container.removeChild(e.target) // 删除该节点
+        console.log(`                      ${++score}                      ${missTimes}`)
+      }
+    </script>
+  </body>
+</html>
